@@ -15,9 +15,6 @@ venv/
 ENV/
 env/
 
-# ML model artifact
-backend/model/anomaly_model.pkl
-
 # Node
 node_modules/
 frontend/dist/
