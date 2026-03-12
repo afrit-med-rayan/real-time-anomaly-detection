@@ -41,3 +41,33 @@ def get_recent_events(limit: int = 100) -> List[Dict]:
 def clear_events() -> None:
     """Clear all events (mostly useful for testing)."""
     _events_queue.clear()
+
+
+def get_recent_anomalies(limit: int = 100) -> List[Dict]:
+    """
+    Retrieve the latest processed events that were flagged as anomalies.
+    """
+    events = list(_events_queue)
+    anomalies = [e for e in events if e.get("is_anomaly")]
+    return anomalies[:limit]
+
+
+def get_metrics() -> Dict[str, float]:
+    """
+    Compute basic metrics over the current retained events queue.
+    """
+    events = list(_events_queue)
+    total_events = len(events)
+    if total_events == 0:
+        return {
+            "total_observed": 0,
+            "total_anomalies": 0,
+            "anomaly_rate": 0.0
+        }
+    
+    total_anomalies = sum(1 for e in events if e.get("is_anomaly"))
+    return {
+        "total_observed": total_events,
+        "total_anomalies": total_anomalies,
+        "anomaly_rate": total_anomalies / total_events
+    }
