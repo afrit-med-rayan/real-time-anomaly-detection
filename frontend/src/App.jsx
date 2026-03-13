@@ -1,121 +1,92 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useEffect, useState } from 'react';
+import SystemMetrics from './components/SystemMetrics';
+import AnomalyChart from './components/AnomalyChart';
+import AlertPanel from './components/AlertPanel';
+import EventTable from './components/EventTable';
+import { useWebSocket } from './hooks/useWebSocket';
+import { fetchMetrics, fetchAnomalies } from './lib/api';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { isConnected, messages: wsEvents } = useWebSocket();
+  const [metrics, setMetrics] = useState(null);
+  const [historicalAnomalies, setHistoricalAnomalies] = useState([]);
+
+  // Fetch initial REST data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const [metricsData, anomaliesData] = await Promise.all([
+          fetchMetrics(),
+          fetchAnomalies(50)
+        ]);
+        setMetrics(metricsData);
+        setHistoricalAnomalies(anomaliesData);
+      } catch (err) {
+        console.error("Failed to load initial REST data:", err);
+      }
+    };
+    
+    loadInitialData();
+    // Refresh metrics periodically (every 5 seconds)
+    const interval = setInterval(loadInitialData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Compute live active anomalies from WebSocket combined with historical
+  const liveAnomalies = wsEvents.filter(e => e.is_anomaly);
+  // Merge historical and live anomalies (deduplicated by ID loosely, or just concat and slice)
+  // Here we just keep the 20 most recent unique anomalies
+  const combinedAnomalies = [...liveAnomalies, ...historicalAnomalies]
+    .filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 10);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <span className="font-bold text-xl text-indigo-600">AnomalyX</span>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {isConnected ? 'Stream Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </nav>
 
-      <div className="ticks"></div>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-4 sm:px-0 flex flex-col space-y-6">
+          
+          {/* Top level metrics */}
+          <section>
+            <SystemMetrics metrics={metrics} />
+          </section>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          {/* Charts & Alerts Grid */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <AnomalyChart data={wsEvents} />
+            </div>
+            <div className="lg:col-span-1">
+              <AlertPanel anomalies={combinedAnomalies} />
+            </div>
+          </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          {/* Table */}
+          <section>
+            <EventTable events={wsEvents} />
+          </section>
+
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default App
+export default App;
