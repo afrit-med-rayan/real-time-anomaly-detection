@@ -7,7 +7,9 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     libc-dev \
+    python3-dev \
     librdkafka-dev \
     && rm -rf /var/lib/apt/lists/*
 
