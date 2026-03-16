@@ -53,10 +53,10 @@ git clone https://github.com/afrit-med-rayan/real-time-anomaly-detection.git
 cd real-time-anomaly-detection
 
 # Build and start all services
-docker compose -f docker/docker-compose.yml up --build
+docker compose -f docker/docker-compose.yml up --build -d
 
 # Open the dashboard
-open http://localhost:5173
+Open your browser to: http://localhost:5173
 ```
 
 ---
