@@ -1,15 +1,27 @@
-FROM python:3.11-slim
+# backend/Dockerfile
+FROM python:3.10-slim-bullseye
 
 WORKDIR /app
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies required by confluent-kafka and some standard C libraries
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    libc-dev \
+    librdkafka-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY backend/ .
+# Optimize layer caching by copying requirements first
+COPY backend/requirements.txt /app/backend/
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-# Train model on first run if not present
-RUN python model/train_model.py || true
+# Copy backend directory
+COPY backend/ /app/backend/
+
+# Set PYTHONPATH so absolute imports like 'backend.api...' work
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the FastAPI server using Uvicorn
+CMD ["uvicorn", "backend.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
